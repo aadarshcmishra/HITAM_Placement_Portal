@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HITAM AI Placement Platform</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f6f8; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #2c3e50; }
+        .btn { background: #4285F4; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; }
+        .btn:hover { background: #357ae8; }
+        .btn-red { background: #e74c3c; float: right; font-size: 12px; }
+        .job-card { border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 8px; background: #fafafa; }
+        .tag { display: inline-block; background: #e8f0fe; color: #1967d2; padding: 2px 8px; border-radius: 12px; font-size: 12px; margin-right: 5px; }
+        .hidden { display: none; }
+        #status { font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎓 HITAM Placement Portal</h1>
+
+        <div id="loginSection">
+            <p>Welcome! Please sign in to access drives.</p>
+            <button id="loginBtn" class="btn">Sign in with Google</button>
+        </div>
+
+        <div id="dashboardSection" class="hidden">
+            <button id="logoutBtn" class="btn btn-red">Logout</button>
+            <h2 id="welcomeText">Student Dashboard</h2>
+
+            <div style="background: #eef2f5; padding: 20px; border-radius: 8px;">
+                <h3>📂 1. Upload Resume</h3>
+                <input type="file" id="resumeFile" accept=".pdf" />
+                <button id="uploadBtn" class="btn">Upload & Analyze</button>
+                <p id="status" style="color: gray;">Waiting for upload...</p>
+            </div>
+
+            <div id="profileSection" class="hidden" style="margin-top: 30px; border-left: 5px solid #4285F4; padding-left: 15px;">
+                <h3>🤖 2. AI Profile Analysis</h3>
+                <p><b>Detected Skills:</b> <span id="displaySkills">...</span></p>
+                <p><b>Predicted GPA:</b> <span id="displayGPA">...</span></p>
+            </div>
+
+            <div style="margin-top: 30px;">
+                <h3>🚀 3. Recommended Drives</h3>
+                <div id="jobsList">
+                    <p style="color: gray;">Upload your resume to see matches...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+   <script type="module">
+        // 1. IMPORTS
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // 🔴 PASTE YOUR CONFIG HERE 🔴
+        const firebaseConfig = {
+            apiKey: "AIzaSyAp8W7N6Kc8rm5gMrUZQZKC0tDrF9HA_Yw",
+            authDomain: "hitam-placement-platform.firebaseapp.com",
+            projectId: "hitam-placement-platform",  
+            storageBucket: "hitam-placement-platform.firebasestorage.app",
+            messagingSenderId: "1085929666234",
+            appId: "1:1085929666234:web:1d102d219d5852dce2f483"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI Elements
+        const loginSection = document.getElementById('loginSection');
+        const dashboardSection = document.getElementById('dashboardSection');
+        const statusText = document.getElementById('status');
+        const jobsList = document.getElementById('jobsList');
+
+        // --- AUTH ---
+        document.getElementById('loginBtn').addEventListener('click', () => {
+            signInWithPopup(auth, new GoogleAuthProvider());
+        });
+        document.getElementById('logoutBtn').addEventListener('click', () => signOut(auth));
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                loginSection.classList.add('hidden');
+                dashboardSection.classList.remove('hidden');
+                document.getElementById('welcomeText').innerText = `Welcome, ${user.displayName}`;
+                
+                // Start Listening to Database
+                listenToUserProfile(user.uid);
+            } else {
+                loginSection.classList.remove('hidden');
+                dashboardSection.classList.add('hidden');
+            }
+        });
+
+        // --- UPLOAD (To Local Python Server) ---
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            const file = document.getElementById('resumeFile').files[0];
+            const user = auth.currentUser;
+            
+            if (!file) return alert("Please select a PDF!");
+            
+            statusText.innerText = "⏳ Sending to AI Server...";
+            statusText.style.color = "orange";
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('user_id', user.uid);
+
+            try {
+                // Talk to Python Script
+                const response = await fetch(' https://ngrok.com/pricing /upload_resume', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    statusText.innerText = "✅ Analysis Complete! Updating UI...";
+                    statusText.style.color = "green";
+                } else {
+                    throw new Error("Server Error");
+                }
+            } catch (err) {
+                console.error(err);
+                statusText.innerText = "❌ Error: Make sure python ai_backend.py is running!";
+                statusText.style.color = "red";
+            }
+        });
+
+        // --- REAL-TIME LISTENER ---
+        function listenToUserProfile(uid) {
+            console.log("🎧 Listening for updates for user:", uid);
+            
+            onSnapshot(doc(db, "students", uid), (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    console.log("✨ New Data Received:", data);
+
+                    if (data.ai_analysis) {
+                        // 1. Show Analysis
+                        document.getElementById('profileSection').classList.remove('hidden');
+                        document.getElementById('displaySkills').innerHTML = 
+                            data.ai_analysis.skills.map(s => `<span class="tag">${s}</span>`).join(" ");
+                        document.getElementById('displayGPA').innerText = data.ai_analysis.gpa || "N/A";
+
+                        // 2. Load Jobs
+                        loadMatchingJobs(data.ai_analysis.skills);
+                    }
+                }
+            });
+        }
+
+       // Import 'getDocs' and 'collection' at the top of your script if not already there!
+        // But for simplicity, we assume they are available from the SDK imports.
+        //import { getDocs, collection } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"; 
+
+        // ... (Keep existing imports)
+
+        async function loadMatchingJobs(userSkills) {
+            jobsList.innerHTML = "<p>🔍 Searching database for matches...</p>";
+            
+            try {
+                // 1. Fetch ALL drives from Firestore
+                const querySnapshot = await getDocs(collection(db, "drives"));
+                let matchCount = 0;
+                jobsList.innerHTML = ""; // Clear loading text
+
+                querySnapshot.forEach((doc) => {
+                    const job = doc.data();
+                    
+                    // 2. Check for Matching Skills
+                    // We check if the job requires ANY of the user's skills
+                    const isMatch = job.required_skills.some(reqSkill => 
+                        userSkills.includes(reqSkill)
+                    );
+
+                    if (isMatch) {
+                        matchCount++;
+                        jobsList.innerHTML += `
+                            <div class="job-card">
+                                <h3>${job.company} - ${job.role}</h3>
+                                <p>Requires: ${job.required_skills.map(s => `<span class="tag">${s}</span>`).join("")}</p>
+                                <button class="btn" style="font-size:12px; padding:5px;">Apply Now</button>
+                            </div>`;
+                    }
+                });
+
+                if (matchCount === 0) {
+                    jobsList.innerHTML = "<p>No matching drives found yet. Check back later!</p>";
+                }
+
+            } catch (error) {
+                console.error("Error fetching jobs:", error);
+                jobsList.innerHTML = "<p style='color:red'>Error loading jobs.</p>";
+            }
+        }
+    </script>
+</body>
+</html>

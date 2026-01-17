@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin - Post New Drive</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 40px; background: #2c3e50; }
+        .container { max-width: 500px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+        input, button { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+        button { background: #27ae60; color: white; border: none; font-weight: bold; cursor: pointer; }
+        button:hover { background: #219150; }
+        label { font-weight: bold; color: #333; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>📢 Post a New Drive</h2>
+        
+        <label>Company Name</label>
+        <input type="text" id="company" placeholder="e.g. Google">
+        
+        <label>Job Role</label>
+        <input type="text" id="role" placeholder="e.g. Software Engineer">
+        
+        <label>Required Skills (comma separated)</label>
+        <input type="text" id="skills" placeholder="e.g. Python, Java, DSA">
+        
+        <button id="postBtn">Post Drive</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // 🔴 PASTE YOUR CONFIG HERE 🔴
+       const firebaseConfig = {
+            apiKey: "AIzaSyAp8W7N6Kc8rm5gMrUZQZKC0tDrF9HA_Yw",
+            authDomain: "hitam-placement-platform.firebaseapp.com",
+            projectId: "hitam-placement-platform",
+            storageBucket: "hitam-placement-platform.firebasestorage.app",
+            messagingSenderId: "1085929666234",
+            appId: "1:1085929666234:web:1d102d219d5852dce2f483"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        document.getElementById('postBtn').addEventListener('click', async () => {
+            const company = document.getElementById('company').value;
+            const role = document.getElementById('role').value;
+            const skillsRaw = document.getElementById('skills').value;
+
+            if(!company || !role || !skillsRaw) return alert("Fill all fields!");
+
+            // Convert "Python, Java" -> ["Python", "Java"] (Clean up spaces)
+            const skillsArray = skillsRaw.split(',').map(s => s.trim());
+
+            try {
+                await addDoc(collection(db, "drives"), {
+                    company: company,
+                    role: role,
+                    required_skills: skillsArray,
+                    posted_at: new Date()
+                });
+                alert("✅ Drive Posted Successfully!");
+                // Clear inputs
+                document.getElementById('company').value = "";
+                document.getElementById('role').value = "";
+                document.getElementById('skills').value = "";
+            } catch (e) {
+                console.error(e);
+                alert("❌ Error posting drive");
+            }
+        });
+    </script>
+</body>
+</html>
