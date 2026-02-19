@@ -1,3 +1,29 @@
+# ... imports ...
+
+app = Flask(__name__)
+CORS(app)
+
+# 1. HANDLE FIREBASE KEY (Works on Cloud AND Laptop)
+# On Render, we will upload this file securely.
+if not os.path.exists("serviceAccountKey.json"):
+    print("❌ Error: serviceAccountKey.json not found!")
+else:
+    cred = credentials.Certificate("serviceAccountKey.json")
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app(cred)
+
+# 2. HANDLE GEMINI KEY (Works on Cloud AND Laptop)
+# Check Environment Variable first (Cloud), then fallback to hardcoded (Laptop)
+api_key = os.getenv("GOOGLE_API_KEY") 
+if not api_key:
+    api_key = "AIzaSy..." # Keep your hardcoded key here for local testing
+
+genai.configure(api_key=api_key)
+
+# ... rest of your code ...
+
+
+
 import os
 import json
 import firebase_admin
@@ -6,13 +32,20 @@ import google.generativeai as genai
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from PyPDF2 import PdfReader
+from dotenv import load_dotenv
 
 # ==========================================
 # 1. SETUP
 # ==========================================
 
+# Initialize Flask App
 app = Flask(__name__)
+
+# ENABLE CORS (This fixes the permission error)
 CORS(app)
+
+# Load Environment Variables (for API Key)
+load_dotenv()
 
 # A. Connect to Firebase
 if not os.path.exists("serviceAccountKey.json"):
@@ -27,9 +60,14 @@ if not firebase_admin._apps:
 db = firestore.client()
 
 # B. Connect to Gemini AI
-# PASTE YOUR API KEY HERE
-API_KEY = "AIzaSyATMsYQKdrKN5Jn0EpM8FRwwKO3qj7RYyQ"
-genai.configure(api_key=API_KEY)
+# Get Key from .env file (Secure)
+api_key = "AIzaSyDssYdT_a2mJh7TJm-H5CO5bY8koYdJiZg"
+
+if not api_key:
+    # Fallback if .env fails (Paste key here only for hackathon emergency)
+    api_key = "AIzaSyDssYdT_a2mJh7TJm-H5CO5bY8koYdJiZg"
+
+genai.configure(api_key=api_key)
 
 # We use the standard free model
 model = genai.GenerativeModel('gemini-2.5-flash')
@@ -71,26 +109,24 @@ def analyze_with_gemini(text):
     Resume Text:
     {text[:10000]} 
     """
-    # Truncated text to 10k chars to avoid token limits
     
     try:
         response = model.generate_content(prompt)
         
         # DEBUG: Print exactly what Gemini sent back
-        print(f"   📝 Gemini Raw Response: {response.text[:100]}...") 
+        # print(f"   📝 Gemini Raw Response: {response.text[:100]}...") 
         
         # Clean up any potential markdown just in case
         clean_json = response.text.strip()
         if clean_json.startswith("```json"):
             clean_json = clean_json.replace("```json", "").replace("```", "")
+        elif clean_json.startswith("```"):
+            clean_json = clean_json.replace("```", "")
         
         return json.loads(clean_json)
         
     except Exception as e:
         print(f"❌ AI Analysis Failed: {e}")
-        # If it's a safety block, print that specifically
-        if hasattr(response, 'prompt_feedback'):
-            print(f"   Safety Feedback: {response.prompt_feedback}")
         return None
 
 # ==========================================

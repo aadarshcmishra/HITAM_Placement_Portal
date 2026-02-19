@@ -1,7 +1,12 @@
+
+import os
+from dotenv import load_dotenv
+
+load_dotenv() # This loads the .env file
 import google.generativeai as genai
 
 
-genai.configure(api_key="AIzaSyATMsYQKdrKN5Jn0EpM8FRwwKO3qj7RYyQ")
+genai.configure(api_key="AIzaSyDssYdT_a2mJh7TJm-H5CO5bY8koYdJiZg")
 
 print("Checking available models...")
 try:

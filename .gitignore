@@ -80,3 +80,12 @@ serviceAccountKey.json
 # Local Tools & Data
 ngrok.exe
 local_resumes/
+
+# .env file
+GOOGLE_API_KEY=AIzaSyATMsYQKdrKN5Jn0EpM8FRwwKO3qj7RYyQ
+
+
+.env
+serviceAccountKey.json
+local_resumes/
+__pycache__/
