@@ -1,29 +1,3 @@
-# ... imports ...
-
-app = Flask(__name__)
-CORS(app)
-
-# 1. HANDLE FIREBASE KEY (Works on Cloud AND Laptop)
-# On Render, we will upload this file securely.
-if not os.path.exists("serviceAccountKey.json"):
-    print("❌ Error: serviceAccountKey.json not found!")
-else:
-    cred = credentials.Certificate("serviceAccountKey.json")
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(cred)
-
-# 2. HANDLE GEMINI KEY (Works on Cloud AND Laptop)
-# Check Environment Variable first (Cloud), then fallback to hardcoded (Laptop)
-api_key = os.getenv("GOOGLE_API_KEY") 
-if not api_key:
-    api_key = "AIzaSy..." # Keep your hardcoded key here for local testing
-
-genai.configure(api_key=api_key)
-
-# ... rest of your code ...
-
-
-
 import os
 import json
 import firebase_admin
@@ -41,31 +15,31 @@ from dotenv import load_dotenv
 # Initialize Flask App
 app = Flask(__name__)
 
-# ENABLE CORS (This fixes the permission error)
+# ENABLE CORS (This allows the website to talk to Python)
 CORS(app)
 
-# Load Environment Variables (for API Key)
+# Load Environment Variables (for local testing via .env)
 load_dotenv()
 
 # A. Connect to Firebase
 if not os.path.exists("serviceAccountKey.json"):
-    print("❌ ERROR: serviceAccountKey.json is missing!")
+    print("❌ ERROR: serviceAccountKey.json is missing! Upload it to Render Secret Files.")
     exit(1)
 
 cred = credentials.Certificate("serviceAccountKey.json")
-# Check if app is already initialized to prevent errors on restart
+# Check if app is already initialized to prevent errors
 if not firebase_admin._apps:
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-# B. Connect to Gemini AI
-# Get Key from .env file (Secure)
-api_key = "AIzaSyDssYdT_a2mJh7TJm-H5CO5bY8koYdJiZg"
+# B. Connect to Gemini AI (SECURE METHOD)
+# This reads the key securely from Render's Environment Variables or your local .env file
+api_key = os.getenv("GOOGLE_API_KEY")
 
 if not api_key:
-    # Fallback if .env fails (Paste key here only for hackathon emergency)
-    api_key = "AIzaSyDssYdT_a2mJh7TJm-H5CO5bY8koYdJiZg"
+    print("❌ ERROR: GOOGLE_API_KEY is missing! Set it in Render Environment Variables.")
+    exit(1)
 
 genai.configure(api_key=api_key)
 
@@ -112,9 +86,6 @@ def analyze_with_gemini(text):
     
     try:
         response = model.generate_content(prompt)
-        
-        # DEBUG: Print exactly what Gemini sent back
-        # print(f"   📝 Gemini Raw Response: {response.text[:100]}...") 
         
         # Clean up any potential markdown just in case
         clean_json = response.text.strip()
@@ -177,5 +148,8 @@ def upload_resume():
         return jsonify({"error": "AI returned no data"}), 500
 
 if __name__ == '__main__':
-    print("🚀 Server Running on [http://127.0.0.1:5000](http://127.0.0.1:5000)")
-    app.run(debug=True, port=5000)
+    # Cloud platforms like Render assign the PORT dynamically.
+    port = int(os.environ.get('PORT', 5000))
+    print(f"🚀 Server Running on port {port}")
+    # Set debug=False for cloud environments
+    app.run(host='0.0.0.0', port=port, debug=False)
